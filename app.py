@@ -1,29 +1,41 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
 
-st.set_page_config(page_title="Smart Gas Leakage Monitoring System", layout="wide")
+st.set_page_config(
+    page_title="Industrial Gas Safety System",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("Smart Gas Leakage Detection & Prevention System")
-st.markdown("### IoT-Based Real-Time Industrial Safety Monitoring")
+# ----------------------
+# Custom Styling
+# ----------------------
+st.markdown("""
+    <style>
+        body {background-color: #0e1117;}
+        .stMetric {background-color: #1c1f26; padding: 15px; border-radius: 10px;}
+        .big-font {font-size:22px !important;}
+    </style>
+""", unsafe_allow_html=True)
 
-st.divider()
+st.title("Industrial IoT Gas Leakage Detection & Prevention")
+st.markdown("Real-Time Monitoring | Automated Safety Response | AI Decision Support")
 
-uploaded_file = st.file_uploader("Upload Gas Sensor CSV File", type=["csv"])
+# ----------------------
+# Sidebar Control Panel
+# ----------------------
+st.sidebar.header("System Control Panel")
+
+threshold_low = st.sidebar.slider("Medium Risk Threshold", 200, 400, 250)
+threshold_high = st.sidebar.slider("High Risk Threshold", 300, 600, 400)
+
+uploaded_file = st.sidebar.file_uploader("Upload Sensor CSV", type=["csv"])
 
 if uploaded_file is not None:
+
     df = pd.read_csv(uploaded_file)
     df.columns = df.columns.str.strip()
-
-    st.subheader("Sensor Data Overview")
-    st.dataframe(df, use_container_width=True)
-
-    # ---- Metrics ----
-    st.divider()
-    st.subheader("System Metrics")
 
     total_records = len(df)
     avg_gas = df["Gas Readings"].mean()
@@ -31,86 +43,86 @@ if uploaded_file is not None:
     avg_temp = df["Temperature"].mean()
     avg_vibration = df["Vibration"].mean()
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Records", total_records)
-    col2.metric("Avg Gas Level", round(avg_gas, 2))
-    col3.metric("Avg Temperature", round(avg_temp, 2))
-    col4.metric("Avg Vibration", round(avg_vibration, 2))
-
-    # ---- Risk Classification ----
-    st.divider()
-    st.subheader("Leakage Risk Assessment")
-
-    THRESHOLD_LOW = 250
-    THRESHOLD_HIGH = 400
-
+    # Risk Classification
     def classify_risk(value):
-        if value > THRESHOLD_HIGH:
+        if value > threshold_high:
             return "HIGH"
-        elif value > THRESHOLD_LOW:
+        elif value > threshold_low:
             return "MEDIUM"
         else:
             return "LOW"
 
     df["Risk Level"] = df["Gas Readings"].apply(classify_risk)
-
     high_risk_count = len(df[df["Risk Level"] == "HIGH"])
 
+    shutoff_status = "ACTIVATED" if high_risk_count > 0 else "STANDBY"
+
+    # ----------------------
+    # Dashboard Layout
+    # ----------------------
+    st.subheader("System Performance Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Records", total_records)
+    col2.metric("Average Gas", round(avg_gas, 2))
+    col3.metric("Average Temp", round(avg_temp, 2))
+    col4.metric("Average Vibration", round(avg_vibration, 2))
+
+    st.divider()
+
+    # Risk Display
+    st.subheader("Safety Risk Analysis")
+
     if high_risk_count > 0:
-        st.error(f"{high_risk_count} High-Risk Gas Events Detected")
-        shutoff_status = "ACTIVATED"
+        st.error(f"{high_risk_count} HIGH-RISK EVENTS DETECTED")
     else:
-        st.success("System Operating Normally")
-        shutoff_status = "STANDBY"
+        st.success("System Stable — No Critical Leak Detected")
 
-    st.write(f"**Safety Valve Status:** {shutoff_status}")
+    # Valve Indicator
+    st.markdown("### Valve Control System")
+    if shutoff_status == "ACTIVATED":
+        st.markdown("🟥 **EMERGENCY SHUTOFF ACTIVATED**")
+    else:
+        st.markdown("🟩 **VALVE IN STANDBY MODE**")
 
-    # ---- Charts ----
     st.divider()
-    st.subheader("Sensor Trends")
 
-    st.line_chart(df["Gas Readings"])
-    st.line_chart(df["Temperature"])
-    st.line_chart(df["Vibration"])
+    # Charts
+    st.subheader("Live Sensor Trends")
+    st.line_chart(df[["Gas Readings", "Temperature", "Vibration"]])
 
-    # ---- Professional Summary ----
     st.divider()
-    st.subheader("Operational Summary")
 
-    summary_text = f"""
-    The system analyzed {total_records} sensor records.
-    Maximum gas concentration recorded was {round(max_gas,2)} units.
-    Current valve status: {shutoff_status}.
-    Continuous monitoring ensures proactive industrial safety.
-    """
+    # ----------------------
+    # AI Assistant
+    # ----------------------
+    st.subheader("AI Monitoring Assistant")
 
-    st.info(summary_text)
+    user_query = st.text_input("Ask system status or statistics:")
 
-    # ---- PDF Download ----
-    st.divider()
-    st.subheader("Download Incident Report")
+    def ai_response(query):
+        query = query.lower()
 
-    if st.button("Generate Incident Report PDF"):
-        file_path = "Incident_Report.pdf"
-        doc = SimpleDocTemplate(file_path)
-        elements = []
-        styles = getSampleStyleSheet()
+        if "average gas" in query:
+            return f"Average gas concentration is {round(avg_gas,2)} units."
 
-        elements.append(Paragraph("Smart Gas Leakage Detection System - Incident Report", styles["Heading1"]))
-        elements.append(Spacer(1, 0.3 * inch))
-        elements.append(Paragraph(f"Generated On: {datetime.now()}", styles["Normal"]))
-        elements.append(Spacer(1, 0.3 * inch))
-        elements.append(Paragraph(summary_text, styles["Normal"]))
+        elif "max gas" in query or "maximum gas" in query:
+            return f"Maximum recorded gas concentration is {round(max_gas,2)} units."
 
-        doc.build(elements)
+        elif "risk" in query:
+            return f"There are {high_risk_count} high-risk leakage events."
 
-        with open(file_path, "rb") as f:
-            st.download_button(
-                label="Download Report",
-                data=f,
-                file_name="Smart_Gas_Leakage_Report.pdf",
-                mime="application/pdf"
-            )
+        elif "valve" in query:
+            return f"Valve status is currently {shutoff_status}."
+
+        elif "summary" in query:
+            return f"{total_records} records analyzed. Max gas: {round(max_gas,2)}. Valve: {shutoff_status}."
+
+        else:
+            return "I can provide gas statistics, temperature stats, risk assessment, or system summary."
+
+    if user_query:
+        st.info(ai_response(user_query))
 
 else:
-    st.info("Upload a CSV file to start monitoring.")
+    st.info("Upload sensor CSV from the sidebar to activate monitoring system.")
