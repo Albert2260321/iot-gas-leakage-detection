@@ -141,7 +141,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (AI STUDIO REST METHOD)
+    # GEMINI AI SECTION (CORRECT v1 ENDPOINT)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -179,7 +179,8 @@ if uploaded_file:
         Provide a professional, safety-focused response.
         """
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+        # ✅ CORRECT NEW ENDPOINT (v1)
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
 
         headers = {
             "Content-Type": "application/json"
