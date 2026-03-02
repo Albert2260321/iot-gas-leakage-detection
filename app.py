@@ -139,7 +139,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (NEW SDK)
+    # GEMINI AI SECTION (STABLE MODEL)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -181,7 +181,7 @@ if uploaded_file:
             """
 
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-1.0-pro",
                 contents=prompt
             )
 
