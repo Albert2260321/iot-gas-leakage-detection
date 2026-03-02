@@ -44,7 +44,6 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     df.columns = df.columns.str.strip()
 
-    # Convert safely
     df["Gas Readings"] = pd.to_numeric(df["Gas Readings"], errors="coerce")
     df["Temperature"] = pd.to_numeric(df["Temperature"], errors="coerce")
     df["Vibration"] = pd.to_numeric(df["Vibration"], errors="coerce")
@@ -54,9 +53,6 @@ if uploaded_file:
     avg_vib = df["Vibration"].mean()
     max_gas = df["Gas Readings"].max()
 
-    # ----------------------------
-    # RISK CLASSIFICATION
-    # ----------------------------
     high_risk_count = len(df[df["Gas Readings"] > high_threshold])
     medium_risk_count = len(
         df[(df["Gas Readings"] > medium_threshold) &
@@ -86,7 +82,7 @@ if uploaded_file:
         st.success("VALVE OPEN - SYSTEM SAFE")
 
     # ----------------------------
-    # RISK EVALUATION
+    # RISK LEVEL
     # ----------------------------
     st.subheader("Risk Evaluation")
 
@@ -141,7 +137,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (CORRECT v1 ENDPOINT)
+    # GEMINI AI SECTION (FINAL CORRECT ENDPOINT)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -179,8 +175,7 @@ if uploaded_file:
         Provide a professional, safety-focused response.
         """
 
-        # ✅ CORRECT NEW ENDPOINT (v1)
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://api.google.dev/gemini/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
 
         headers = {
             "Content-Type": "application/json"
