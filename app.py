@@ -125,6 +125,64 @@ if uploaded_file:
         st.success("🟢 VALVE OPEN — System Operating Normally")
 
     # ----------------------------
+    # INTELLIGENT ALERT EXPLANATION PANEL
+    # ----------------------------
+    st.subheader("Alert Explanation & Diagnostic Reasoning")
+
+    # Gas Alert
+    if len(high_risk) > 0:
+        st.error(f"""
+CRITICAL GAS ALERT  
+{len(high_risk)} readings exceeded high threshold ({high_threshold}).  
+Maximum recorded gas level: {max_gas}.  
+Gas concentration crossed critical safety limit.
+""")
+    elif len(medium_risk) > 0:
+        st.warning(f"""
+MODERATE GAS ALERT  
+{len(medium_risk)} readings exceeded medium threshold ({medium_threshold}).  
+Elevated gas presence detected.
+""")
+    else:
+        st.success("Gas levels are within safe operating range.")
+
+    # Temperature Alert
+    if len(high_temp) > 0:
+        st.warning(f"""
+TEMPERATURE ALERT  
+{len(high_temp)} readings exceeded temperature threshold ({temp_threshold}).  
+High temperature increases ignition probability.
+""")
+    else:
+        st.success("Temperature within normal limits.")
+
+    # Vibration Alert
+    if len(vibration_detected) > 0:
+        if avg_gas < medium_threshold:
+            st.info("""
+VIBRATION DETECTED  
+Mechanical disturbance observed.  
+Gas levels remain stable — likely external movement.
+""")
+        else:
+            st.warning("""
+VIBRATION + GAS ELEVATION  
+Combined anomaly detected. Inspection recommended.
+""")
+    else:
+        st.success("No abnormal vibration detected.")
+
+    # Combined Risk
+    st.subheader("Integrated Risk Interpretation")
+
+    if risk_score >= 60:
+        st.error(f"HIGH RISK CONDITION — Risk Score: {risk_score}/100")
+    elif risk_score >= 30:
+        st.warning(f"MODERATE RISK CONDITION — Risk Score: {risk_score}/100")
+    else:
+        st.success(f"SYSTEM STABLE — Risk Score: {risk_score}/100")
+
+    # ----------------------------
     # HEATMAP
     # ----------------------------
     st.subheader("Gas Risk Heatmap")
@@ -150,13 +208,13 @@ if uploaded_file:
     # ----------------------------
     # CSV DOWNLOAD
     # ----------------------------
-    buffer = BytesIO()
-    df.to_csv(buffer, index=False)
-    buffer.seek(0)
+    csv_buffer = BytesIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)
 
     st.download_button(
         label="Download Sensor CSV Report",
-        data=buffer,
+        data=csv_buffer,
         file_name="sensor_report.csv",
         mime="text/csv"
     )
@@ -173,14 +231,11 @@ if uploaded_file:
         elements.append(Paragraph("Smart Gas Leakage Detection System Report", styles["Heading1"]))
         elements.append(Spacer(1, 0.3 * inch))
 
-        elements.append(Paragraph("Executive Summary", styles["Heading2"]))
-        elements.append(Spacer(1, 0.2 * inch))
-
         summary_text = f"""
-        Risk Score: {risk_score}/100  
-        Severity Level: {severity_label}  
-        Valve Status: {"Closed" if risk_score >= 60 else "Open"}
-        """
+Risk Score: {risk_score}/100  
+Severity Level: {severity_label}  
+Valve Status: {"Closed" if risk_score >= 60 else "Open"}
+"""
         elements.append(Paragraph(summary_text, styles["Normal"]))
         elements.append(Spacer(1, 0.3 * inch))
 
@@ -195,10 +250,9 @@ if uploaded_file:
             ["Vibration Events", len(vibration_detected)],
         ]
 
-        table = Table(table_data, colWidths=[3*inch, 2*inch])
+        table = Table(table_data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
             ('GRID', (0,0), (-1,-1), 1, colors.black),
         ]))
 
@@ -215,57 +269,6 @@ if uploaded_file:
         file_name="Gas_Leakage_System_Report.pdf",
         mime="application/pdf"
     )
-
-    # ----------------------------
-    # SMART ASSISTANT (RESTORED)
-    # ----------------------------
-    st.subheader("Smart Safety Assistant")
-
-    questions = [
-        "Is the system safe?",
-        "What is the risk score?",
-        "What is the severity level?",
-        "Explain valve status",
-        "Should inspection be done?",
-        "What is average gas level?",
-        "How many high gas events?",
-        "Give executive summary"
-    ]
-
-    selected = st.selectbox("Select a question:", ["-- Select --"] + questions)
-    user_input = st.text_input("Or type your own question:")
-
-    if user_input:
-        q = user_input.lower()
-    elif selected != "-- Select --":
-        q = selected.lower()
-    else:
-        q = None
-
-    if q:
-        if "safe" in q:
-            st.success("System is safe." if risk_score < 60 else "System is NOT safe.")
-        elif "risk score" in q:
-            st.info(f"Risk Score: {risk_score}/100")
-        elif "severity" in q:
-            st.info(f"Severity Level: {severity_label}")
-        elif "valve" in q:
-            st.info("Valve Closed." if risk_score >= 60 else "Valve Open.")
-        elif "inspection" in q:
-            st.warning("Inspection recommended." if risk_score >= 60 else "Inspection not required.")
-        elif "average gas" in q:
-            st.info(f"Average Gas: {round(avg_gas,2)}")
-        elif "high gas" in q:
-            st.info(f"High Gas Events: {len(high_risk)}")
-        elif "summary" in q:
-            st.info(f"""
-Risk Score: {risk_score}
-Severity: {severity_label}
-High Gas Events: {len(high_risk)}
-High Temp Events: {len(high_temp)}
-""")
-        else:
-            st.info("Ask about risk, safety, valve, inspection or summary.")
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
