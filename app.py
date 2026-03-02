@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import google.generativeai as genai
 from io import BytesIO
 
 # ----------------------------
@@ -43,7 +42,7 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     df.columns = df.columns.str.strip()
 
-    # Convert safely to numeric
+    # Convert safely
     df["Gas Readings"] = pd.to_numeric(df["Gas Readings"], errors="coerce")
     df["Temperature"] = pd.to_numeric(df["Temperature"], errors="coerce")
     df["Vibration"] = pd.to_numeric(df["Vibration"], errors="coerce")
@@ -140,7 +139,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION
+    # GEMINI AI SECTION (NEW SDK)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -151,11 +150,9 @@ if uploaded_file:
     st.write("- Provide executive safety summary.")
 
     try:
-        # Configure Gemini using Streamlit secrets
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        from google import genai
 
-        # Use stable supported model
-        model = genai.GenerativeModel("gemini-pro")
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
         user_input = st.text_input("Ask about system status...")
 
@@ -183,7 +180,11 @@ if uploaded_file:
             Provide a professional, safety-focused response.
             """
 
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt
+            )
+
             st.info(response.text)
 
     except Exception as e:
