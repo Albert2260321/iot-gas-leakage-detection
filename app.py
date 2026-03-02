@@ -5,25 +5,12 @@ from io import BytesIO
 import plotly.graph_objects as go
 
 # ----------------------------
-# PROFESSIONAL DARK THEME
+# PAGE CONFIG
 # ----------------------------
 st.set_page_config(
     page_title="Smart Gas Leakage Monitoring System",
     layout="wide"
 )
-
-st.markdown("""
-<style>
-body {
-    background-color: #0E1117;
-}
-.metric-box {
-    padding: 10px;
-    border-radius: 10px;
-    background-color: #1C1F26;
-}
-</style>
-""", unsafe_allow_html=True)
 
 st.title("Smart Gas Leakage Detection & Prevention System")
 
@@ -54,14 +41,16 @@ if uploaded_file:
     avg_temp = df["Temperature"].mean()
     avg_vib = df["Vibration"].mean()
     max_gas = df["Gas Readings"].max()
+    min_gas = df["Gas Readings"].min()
 
     high_risk = df[df["Gas Readings"] > high_threshold]
     medium_risk = df[(df["Gas Readings"] > medium_threshold) &
                      (df["Gas Readings"] <= high_threshold)]
     high_temp = df[df["Temperature"] > temp_threshold]
+    vibration_detected = df[df["Vibration"] > 0]
 
     # ----------------------------
-    # RISK SCORE CALCULATION (0–100)
+    # RISK SCORE CALCULATION
     # ----------------------------
     gas_score = min((avg_gas / high_threshold) * 50, 50)
     temp_score = min((avg_temp / temp_threshold) * 30, 30)
@@ -70,7 +59,7 @@ if uploaded_file:
     risk_score = round(gas_score + temp_score + vibration_score)
 
     # ----------------------------
-    # RISK SEVERITY COLOR
+    # SEVERITY CLASSIFICATION
     # ----------------------------
     if risk_score < 30:
         severity_color = "green"
@@ -87,22 +76,22 @@ if uploaded_file:
     # ----------------------------
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("Average Gas", round(avg_gas,2))
-    col2.metric("Average Temp", round(avg_temp,2))
-    col3.metric("Average Vibration", round(avg_vib,2))
+    col1.metric("Average Gas", round(avg_gas, 2))
+    col2.metric("Average Temperature", round(avg_temp, 2))
+    col3.metric("Average Vibration", round(avg_vib, 2))
     col4.metric("Max Gas", max_gas)
 
     # ----------------------------
-    # RISK SEVERITY SCALE
+    # SEVERITY DISPLAY
     # ----------------------------
     st.subheader("Risk Severity Level")
-
-    st.markdown(f"""
-    <h2 style='color:{severity_color};'>{severity_label}</h2>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f"<h2 style='color:{severity_color};'>{severity_label}</h2>",
+        unsafe_allow_html=True
+    )
 
     # ----------------------------
-    # RISK SCORE GAUGE
+    # RISK GAUGE
     # ----------------------------
     st.subheader("Overall Risk Score (0–100)")
 
@@ -125,24 +114,29 @@ if uploaded_file:
     # ----------------------------
     # VALVE STATUS
     # ----------------------------
-    st.subheader("Valve Status")
+    st.subheader("Automatic Safety Valve Status")
 
     if risk_score >= 60:
-        st.error("🔴 VALVE CLOSED — Automatic Leak Prevention Activated")
+        st.error("🔴 VALVE CLOSED — Leak Prevention Activated")
     else:
-        st.success("🟢 VALVE OPEN — System Stable")
+        st.success("🟢 VALVE OPEN — System Operating Normally")
 
     # ----------------------------
-    # HEATMAP TABLE
+    # PLOTLY HEATMAP (FIXED)
     # ----------------------------
     st.subheader("Gas Risk Heatmap")
 
-    st.dataframe(
-        df.style.background_gradient(
-            subset=["Gas Readings"],
-            cmap="Reds"
-        )
+    fig_heatmap = go.Figure(data=go.Heatmap(
+        z=[df["Gas Readings"].values],
+        colorscale="Reds"
+    ))
+
+    fig_heatmap.update_layout(
+        height=200,
+        margin=dict(l=20, r=20, t=20, b=20)
     )
+
+    st.plotly_chart(fig_heatmap, use_container_width=True)
 
     # ----------------------------
     # TRENDS
@@ -157,7 +151,21 @@ if uploaded_file:
     st.line_chart(df["Vibration"] * 10)
 
     # ----------------------------
-    # SMART CHAT
+    # DOWNLOAD REPORT
+    # ----------------------------
+    buffer = BytesIO()
+    df.to_csv(buffer, index=False)
+    buffer.seek(0)
+
+    st.download_button(
+        label="Download Sensor Report",
+        data=buffer,
+        file_name="sensor_report.csv",
+        mime="text/csv"
+    )
+
+    # ----------------------------
+    # SMART ASSISTANT
     # ----------------------------
     st.subheader("Smart Safety Assistant")
 
@@ -165,9 +173,15 @@ if uploaded_file:
         "Is the system safe?",
         "What is the risk score?",
         "What is the risk severity?",
-        "Should inspection be done?",
         "Explain valve status",
-        "Give executive summary"
+        "Should inspection be done?",
+        "What is the average gas level?",
+        "What is the maximum gas level?",
+        "How many high gas events occurred?",
+        "How many high temperature events occurred?",
+        "How many vibration events occurred?",
+        "Give executive summary",
+        "Overall system health status"
     ]
 
     selected = st.selectbox("Select a question:", ["-- Select --"] + questions)
@@ -187,14 +201,21 @@ if uploaded_file:
             st.info(f"Overall risk score is {risk_score}/100.")
         elif "severity" in q:
             st.info(f"Current severity level: {severity_label}.")
-        elif "inspection" in q:
-            if risk_score >= 60:
-                st.error("Immediate inspection recommended.")
-            else:
-                st.success("No immediate inspection required.")
         elif "valve" in q:
             st.info("Valve is Closed." if risk_score >= 60 else "Valve is Open.")
-        elif "summary" in q:
+        elif "inspection" in q:
+            st.warning("Inspection recommended." if risk_score >= 60 else "Inspection not required.")
+        elif "average gas" in q:
+            st.info(f"Average gas level: {round(avg_gas,2)}")
+        elif "maximum gas" in q:
+            st.info(f"Maximum gas level recorded: {max_gas}")
+        elif "high gas" in q:
+            st.info(f"High gas events: {len(high_risk)}")
+        elif "temperature" in q:
+            st.info(f"High temperature events: {len(high_temp)}")
+        elif "vibration" in q:
+            st.info(f"Vibration events: {len(vibration_detected)}")
+        elif "summary" in q or "health" in q:
             st.info(f"""
 Executive Summary:
 • Risk Score: {risk_score}
@@ -204,7 +225,7 @@ Executive Summary:
 • High Temp Events: {len(high_temp)}
 """)
         else:
-            st.info("Ask about risk, safety, valve, inspection or summary.")
+            st.info("Please ask about risk, safety, valve, inspection, gas, temperature or summary.")
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
