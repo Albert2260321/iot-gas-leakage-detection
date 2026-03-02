@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
+import json
 from io import BytesIO
 
 # ----------------------------
@@ -139,7 +141,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (STABLE MODEL)
+    # GEMINI AI SECTION (AI STUDIO REST METHOD)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -149,47 +151,57 @@ if uploaded_file:
     st.write("- Suggest mitigation strategies.")
     st.write("- Provide executive safety summary.")
 
-    try:
-        from google import genai
+    user_input = st.text_input("Ask about system status...")
 
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    if user_input:
 
-        user_input = st.text_input("Ask about system status...")
+        api_key = st.secrets["GEMINI_API_KEY"]
 
-        if user_input:
+        context = f"""
+        Gas Average: {avg_gas}
+        Gas Maximum: {max_gas}
+        High Risk Events: {high_risk_count}
+        Medium Risk Events: {medium_risk_count}
+        Valve Status: {"Closed" if valve_closed else "Open"}
+        Medium Threshold: {medium_threshold}
+        High Threshold: {high_threshold}
+        """
 
-            context = f"""
-            Gas Average: {avg_gas}
-            Gas Maximum: {max_gas}
-            High Risk Events: {high_risk_count}
-            Medium Risk Events: {medium_risk_count}
-            Valve Status: {"Closed" if valve_closed else "Open"}
-            Medium Threshold: {medium_threshold}
-            High Threshold: {high_threshold}
-            """
+        prompt = f"""
+        You are an industrial IoT gas safety monitoring AI assistant.
 
-            prompt = f"""
-            You are an industrial IoT gas safety monitoring AI assistant.
+        System Data:
+        {context}
 
-            System Data:
-            {context}
+        User Question:
+        {user_input}
 
-            User Question:
-            {user_input}
+        Provide a professional, safety-focused response.
+        """
 
-            Provide a professional, safety-focused response.
-            """
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
 
-            response = client.models.generate_content(
-                model="gemini-1.0-pro",
-                contents=prompt
-            )
+        headers = {
+            "Content-Type": "application/json"
+        }
 
-            st.info(response.text)
+        data = {
+            "contents": [{
+                "parts": [{
+                    "text": prompt
+                }]
+            }]
+        }
 
-    except Exception as e:
-        st.error("AI Error:")
-        st.write(e)
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+
+        if response.status_code == 200:
+            result = response.json()
+            ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            st.info(ai_text)
+        else:
+            st.error("AI Error:")
+            st.write(response.text)
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
