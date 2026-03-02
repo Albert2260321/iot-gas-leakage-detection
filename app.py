@@ -4,6 +4,13 @@ import numpy as np
 from io import BytesIO
 import plotly.graph_objects as go
 
+# PDF imports
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import pagesizes
+from reportlab.lib.units import inch
+
 # ----------------------------
 # PAGE CONFIG
 # ----------------------------
@@ -75,7 +82,6 @@ if uploaded_file:
     # METRICS
     # ----------------------------
     col1, col2, col3, col4 = st.columns(4)
-
     col1.metric("Average Gas", round(avg_gas, 2))
     col2.metric("Average Temperature", round(avg_temp, 2))
     col3.metric("Average Vibration", round(avg_vib, 2))
@@ -94,7 +100,6 @@ if uploaded_file:
     # RISK GAUGE
     # ----------------------------
     st.subheader("Overall Risk Score (0–100)")
-
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=risk_score,
@@ -108,34 +113,26 @@ if uploaded_file:
             ],
         }
     ))
-
     st.plotly_chart(fig, use_container_width=True)
 
     # ----------------------------
     # VALVE STATUS
     # ----------------------------
     st.subheader("Automatic Safety Valve Status")
-
     if risk_score >= 60:
         st.error("🔴 VALVE CLOSED — Leak Prevention Activated")
     else:
         st.success("🟢 VALVE OPEN — System Operating Normally")
 
     # ----------------------------
-    # PLOTLY HEATMAP (FIXED)
+    # HEATMAP (SAFE VERSION)
     # ----------------------------
     st.subheader("Gas Risk Heatmap")
-
     fig_heatmap = go.Figure(data=go.Heatmap(
         z=[df["Gas Readings"].values],
         colorscale="Reds"
     ))
-
-    fig_heatmap.update_layout(
-        height=200,
-        margin=dict(l=20, r=20, t=20, b=20)
-    )
-
+    fig_heatmap.update_layout(height=200)
     st.plotly_chart(fig_heatmap, use_container_width=True)
 
     # ----------------------------
@@ -151,81 +148,97 @@ if uploaded_file:
     st.line_chart(df["Vibration"] * 10)
 
     # ----------------------------
-    # DOWNLOAD REPORT
+    # CSV DOWNLOAD
     # ----------------------------
     buffer = BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
 
     st.download_button(
-        label="Download Sensor Report",
+        label="Download Sensor CSV Report",
         data=buffer,
         file_name="sensor_report.csv",
         mime="text/csv"
     )
 
     # ----------------------------
-    # SMART ASSISTANT
+    # PROFESSIONAL PDF REPORT
     # ----------------------------
-    st.subheader("Smart Safety Assistant")
+    def generate_pdf():
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=pagesizes.A4)
+        elements = []
+        styles = getSampleStyleSheet()
 
-    questions = [
-        "Is the system safe?",
-        "What is the risk score?",
-        "What is the risk severity?",
-        "Explain valve status",
-        "Should inspection be done?",
-        "What is the average gas level?",
-        "What is the maximum gas level?",
-        "How many high gas events occurred?",
-        "How many high temperature events occurred?",
-        "How many vibration events occurred?",
-        "Give executive summary",
-        "Overall system health status"
-    ]
+        elements.append(Paragraph("Smart Gas Leakage Detection System Report", styles["Heading1"]))
+        elements.append(Spacer(1, 0.3 * inch))
 
-    selected = st.selectbox("Select a question:", ["-- Select --"] + questions)
-    user_input = st.text_input("Or type your own question:")
+        elements.append(Paragraph("Executive Summary", styles["Heading2"]))
+        elements.append(Spacer(1, 0.2 * inch))
 
-    if user_input:
-        q = user_input.lower()
-    elif selected != "-- Select --":
-        q = selected.lower()
-    else:
-        q = None
+        summary_text = f"""
+        This report provides an operational analysis of the IoT-based Gas Leakage Detection 
+        and Prevention System. The system monitors gas concentration, temperature, and vibration 
+        to determine environmental safety.
 
-    if q:
-        if "safe" in q:
-            st.success("System is safe." if risk_score < 60 else "System is NOT safe.")
-        elif "risk score" in q:
-            st.info(f"Overall risk score is {risk_score}/100.")
-        elif "severity" in q:
-            st.info(f"Current severity level: {severity_label}.")
-        elif "valve" in q:
-            st.info("Valve is Closed." if risk_score >= 60 else "Valve is Open.")
-        elif "inspection" in q:
-            st.warning("Inspection recommended." if risk_score >= 60 else "Inspection not required.")
-        elif "average gas" in q:
-            st.info(f"Average gas level: {round(avg_gas,2)}")
-        elif "maximum gas" in q:
-            st.info(f"Maximum gas level recorded: {max_gas}")
-        elif "high gas" in q:
-            st.info(f"High gas events: {len(high_risk)}")
-        elif "temperature" in q:
-            st.info(f"High temperature events: {len(high_temp)}")
-        elif "vibration" in q:
-            st.info(f"Vibration events: {len(vibration_detected)}")
-        elif "summary" in q or "health" in q:
-            st.info(f"""
-Executive Summary:
-• Risk Score: {risk_score}
-• Severity: {severity_label}
-• Avg Gas: {round(avg_gas,2)}
-• High Gas Events: {len(high_risk)}
-• High Temp Events: {len(high_temp)}
-""")
-        else:
-            st.info("Please ask about risk, safety, valve, inspection, gas, temperature or summary.")
+        Current Risk Score: {risk_score}/100  
+        Severity Level: {severity_label}  
+        Valve Status: {"Closed" if risk_score >= 60 else "Open"}
+        """
+        elements.append(Paragraph(summary_text, styles["Normal"]))
+        elements.append(Spacer(1, 0.4 * inch))
+
+        elements.append(Paragraph("Sensor Metrics Summary", styles["Heading2"]))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        table_data = [
+            ["Metric", "Value"],
+            ["Average Gas Level", round(avg_gas,2)],
+            ["Maximum Gas Level", max_gas],
+            ["Average Temperature", round(avg_temp,2)],
+            ["Average Vibration", round(avg_vib,2)],
+            ["High Gas Events", len(high_risk)],
+            ["High Temperature Events", len(high_temp)],
+            ["Vibration Events", len(vibration_detected)],
+        ]
+
+        table = Table(table_data, colWidths=[3*inch, 2*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('ALIGN',(1,1),(-1,-1),'CENTER')
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 0.4 * inch))
+
+        elements.append(Paragraph("System Logic & Interpretation", styles["Heading2"]))
+        elements.append(Spacer(1, 0.2 * inch))
+
+        theory_text = """
+        The system evaluates safety using threshold-based monitoring and weighted risk scoring.
+        Gas readings are categorized into risk levels. Temperature is evaluated alongside gas
+        to detect combustion risk scenarios. Vibration analysis differentiates mechanical
+        disturbance from genuine leak conditions.
+
+        The consolidated risk score enables automated safety valve control and
+        preventive action when required.
+        """
+
+        elements.append(Paragraph(theory_text, styles["Normal"]))
+        doc.build(elements)
+        pdf_buffer.seek(0)
+        return pdf_buffer
+
+    pdf_data = generate_pdf()
+
+    st.download_button(
+        label="Download Professional PDF Report",
+        data=pdf_data,
+        file_name="Gas_Leakage_System_Report.pdf",
+        mime="application/pdf"
+    )
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
