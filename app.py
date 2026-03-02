@@ -43,7 +43,7 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     df.columns = df.columns.str.strip()
 
-    # Convert to numeric safely
+    # Convert safely to numeric
     df["Gas Readings"] = pd.to_numeric(df["Gas Readings"], errors="coerce")
     df["Temperature"] = pd.to_numeric(df["Temperature"], errors="coerce")
     df["Vibration"] = pd.to_numeric(df["Vibration"], errors="coerce")
@@ -150,12 +150,12 @@ if uploaded_file:
     st.write("- Suggest mitigation strategies.")
     st.write("- Provide executive safety summary.")
 
-    # Debug: check if secret exists
-    st.write("Secret exists:", "GEMINI_API_KEY" in st.secrets)
-
     try:
+        # Configure Gemini using Streamlit secrets
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Use stable supported model
+        model = genai.GenerativeModel("gemini-pro")
 
         user_input = st.text_input("Ask about system status...")
 
