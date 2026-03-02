@@ -1,176 +1,194 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import numpy as np
+import google.generativeai as genai
+from io import BytesIO
 
 # ----------------------------
-# Page Configuration
+# PAGE CONFIG
 # ----------------------------
 st.set_page_config(
-    page_title="Industrial Gas Safety System",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Smart Gas Leakage Monitoring System",
+    layout="wide"
+)
+
+st.title("Smart Gas Leakage Detection & Prevention System")
+
+# ----------------------------
+# SIDEBAR - THRESHOLD SETTINGS
+# ----------------------------
+st.sidebar.header("Risk Threshold Configuration")
+
+medium_threshold = st.sidebar.slider(
+    "Medium Risk Threshold (Gas Level)",
+    min_value=100,
+    max_value=1000,
+    value=400
+)
+
+high_threshold = st.sidebar.slider(
+    "High Risk Threshold (Gas Level)",
+    min_value=200,
+    max_value=1500,
+    value=700
 )
 
 # ----------------------------
-# Custom Industrial Styling
+# FILE UPLOAD
 # ----------------------------
-st.markdown("""
-    <style>
-        body {background-color: #0e1117;}
-        .stMetric {background-color: #1c1f26; padding: 15px; border-radius: 10px;}
-    </style>
-""", unsafe_allow_html=True)
+uploaded_file = st.file_uploader("Upload IoT Sensor CSV File", type=["csv"])
 
-st.title("Industrial IoT Gas Leakage Detection & Prevention System")
-st.markdown("Real-Time Monitoring | Automated Valve Control | AI Decision Support")
+if uploaded_file:
 
-# ----------------------------
-# Sidebar Control Panel
-# ----------------------------
-st.sidebar.header("System Control Panel")
-
-threshold_low = st.sidebar.slider("Medium Risk Threshold", 200, 400, 250)
-threshold_high = st.sidebar.slider("High Risk Threshold", 300, 600, 400)
-
-uploaded_file = st.sidebar.file_uploader("Upload Sensor CSV", type=["csv"])
-
-if uploaded_file is not None:
-
-    # ----------------------------
-    # Load & Clean Data
-    # ----------------------------
     df = pd.read_csv(uploaded_file)
     df.columns = df.columns.str.strip()
 
-    # Force numeric conversion
+    # Convert to numeric safely
     df["Gas Readings"] = pd.to_numeric(df["Gas Readings"], errors="coerce")
     df["Temperature"] = pd.to_numeric(df["Temperature"], errors="coerce")
     df["Vibration"] = pd.to_numeric(df["Vibration"], errors="coerce")
 
-    total_records = len(df)
     avg_gas = df["Gas Readings"].mean()
-    max_gas = df["Gas Readings"].max()
     avg_temp = df["Temperature"].mean()
-    max_temp = df["Temperature"].max()
-    avg_vibration = df["Vibration"].mean()
+    avg_vib = df["Vibration"].mean()
+    max_gas = df["Gas Readings"].max()
 
     # ----------------------------
-    # Risk Classification
+    # RISK CLASSIFICATION
     # ----------------------------
-    def classify_risk(value):
-        if value > threshold_high:
-            return "HIGH"
-        elif value > threshold_low:
-            return "MEDIUM"
-        else:
-            return "LOW"
+    high_risk_count = len(df[df["Gas Readings"] > high_threshold])
+    medium_risk_count = len(
+        df[(df["Gas Readings"] > medium_threshold) &
+           (df["Gas Readings"] <= high_threshold)]
+    )
 
-    df["Risk Level"] = df["Gas Readings"].apply(classify_risk)
-    high_risk_count = len(df[df["Risk Level"] == "HIGH"])
-
-    shutoff_status = "ACTIVATED" if high_risk_count > 0 else "STANDBY"
+    valve_closed = high_risk_count > 0
 
     # ----------------------------
-    # Dashboard Metrics
+    # DASHBOARD METRICS
     # ----------------------------
-    st.subheader("System Performance Overview")
-
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Records", total_records)
-    col2.metric("Average Gas", round(avg_gas, 2))
-    col3.metric("Average Temperature", round(avg_temp, 2))
-    col4.metric("Average Vibration", round(avg_vibration, 2))
 
-    st.divider()
+    col1.metric("Average Gas", round(avg_gas, 2))
+    col2.metric("Average Temperature", round(avg_temp, 2))
+    col3.metric("Average Vibration", round(avg_vib, 2))
+    col4.metric("High Risk Events", high_risk_count)
 
     # ----------------------------
-    # Risk Display
+    # VALVE STATUS
     # ----------------------------
-    st.subheader("Safety Risk Analysis")
+    st.subheader("Automatic Safety Valve Status")
+
+    if valve_closed:
+        st.error("VALVE CLOSED - HIGH GAS DETECTED")
+    else:
+        st.success("VALVE OPEN - SYSTEM SAFE")
+
+    # ----------------------------
+    # RISK EVALUATION
+    # ----------------------------
+    st.subheader("Risk Evaluation")
 
     if high_risk_count > 0:
-        st.error(f"{high_risk_count} HIGH-RISK EVENTS DETECTED")
+        st.error("HIGH RISK - Immediate inspection required.")
+    elif medium_risk_count > 0:
+        st.warning("MEDIUM RISK - Increased monitoring recommended.")
     else:
-        st.success("System Stable — No Critical Leak Detected")
-
-    st.markdown("### Valve Control System")
-
-    if shutoff_status == "ACTIVATED":
-        st.markdown("🟥 **EMERGENCY SHUTOFF ACTIVATED**")
-    else:
-        st.markdown("🟩 **VALVE IN STANDBY MODE**")
-
-    st.divider()
+        st.success("LOW RISK - System operating normally.")
 
     # ----------------------------
-    # Sensor Visualizations
+    # GRAPHS
     # ----------------------------
-    st.subheader("Gas Level Trend")
+    st.subheader("Gas Trend")
     st.line_chart(df["Gas Readings"])
 
     st.subheader("Temperature Trend")
     st.line_chart(df["Temperature"])
 
-    st.subheader("Vibration Activity (Binary Detection)")
-    st.bar_chart(df["Vibration"])
-
-    vibration_events = df["Vibration"].sum()
-    st.write(f"Total Vibration Trigger Events: {int(vibration_events)}")
-
-    st.divider()
+    st.subheader("Vibration Trend (Enhanced Visibility)")
+    st.line_chart(df["Vibration"] * 10)
 
     # ----------------------------
-    # AI Monitoring Assistant
+    # EXECUTIVE SUMMARY
     # ----------------------------
-    st.subheader("AI Monitoring Assistant")
+    st.subheader("Executive Safety Summary")
 
-    st.markdown("### Example Questions:")
-    st.markdown("""
-    - What is average gas level?
-    - What is maximum gas reading?
-    - How many high risk events?
-    - What is valve status?
-    - Give system summary
-    """)
+    summary = f"""
+    Average Gas Level: {round(avg_gas,2)}
+    Maximum Gas Level: {max_gas}
+    High Risk Events: {high_risk_count}
+    Medium Risk Events: {medium_risk_count}
+    Valve Status: {"Closed" if valve_closed else "Open"}
+    Medium Threshold: {medium_threshold}
+    High Threshold: {high_threshold}
+    """
 
-    user_query = st.text_input("Enter your question:")
-
-    def ai_response(query):
-        query = query.lower()
-
-        if "average gas" in query:
-            return f"Average gas concentration is {round(avg_gas,2)} units."
-
-        elif "maximum gas" in query or "max gas" in query:
-            return f"Maximum recorded gas concentration is {round(max_gas,2)} units."
-
-        elif "average temperature" in query:
-            return f"Average temperature is {round(avg_temp,2)} degrees."
-
-        elif "maximum temperature" in query:
-            return f"Maximum recorded temperature is {round(max_temp,2)} degrees."
-
-        elif "high risk" in query or "leak" in query:
-            return f"There are {high_risk_count} high-risk leakage events detected."
-
-        elif "valve" in query:
-            return f"Valve status is currently {shutoff_status}."
-
-        elif "summary" in query:
-            return f"The system analyzed {total_records} records. Maximum gas: {round(max_gas,2)}. High-risk events: {high_risk_count}. Valve status: {shutoff_status}."
-
-        else:
-            return "Please ask about gas levels, temperature, risks, valve status, or system summary."
-
-    if user_query:
-        st.info(ai_response(user_query))
-
-    st.divider()
+    st.write(summary)
 
     # ----------------------------
-    # Footer
+    # REPORT DOWNLOAD
     # ----------------------------
-    st.caption(f"Monitoring Session: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    buffer = BytesIO()
+    df.to_csv(buffer, index=False)
+    buffer.seek(0)
+
+    st.download_button(
+        label="Download Full Sensor Data",
+        data=buffer,
+        file_name="sensor_report.csv",
+        mime="text/csv"
+    )
+
+    # ----------------------------
+    # GEMINI AI SECTION
+    # ----------------------------
+    st.subheader("AI Industrial Safety Assistant")
+
+    st.write("Example prompts:")
+    st.write("- Is the system safe?")
+    st.write("- What risks should management address?")
+    st.write("- Suggest mitigation strategies.")
+    st.write("- Provide executive safety summary.")
+
+    # Debug: check if secret exists
+    st.write("Secret exists:", "GEMINI_API_KEY" in st.secrets)
+
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        user_input = st.text_input("Ask about system status...")
+
+        if user_input:
+
+            context = f"""
+            Gas Average: {avg_gas}
+            Gas Maximum: {max_gas}
+            High Risk Events: {high_risk_count}
+            Medium Risk Events: {medium_risk_count}
+            Valve Status: {"Closed" if valve_closed else "Open"}
+            Medium Threshold: {medium_threshold}
+            High Threshold: {high_threshold}
+            """
+
+            prompt = f"""
+            You are an industrial IoT gas safety monitoring AI assistant.
+
+            System Data:
+            {context}
+
+            User Question:
+            {user_input}
+
+            Provide a professional, safety-focused response.
+            """
+
+            response = model.generate_content(prompt)
+            st.info(response.text)
+
+    except Exception as e:
+        st.error("AI Error:")
+        st.write(e)
 
 else:
-    st.info("Upload sensor CSV from the sidebar to activate monitoring system.")
+    st.info("Upload a CSV file to begin monitoring.")
