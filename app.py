@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import json
 from io import BytesIO
+import google.generativeai as genai
 
 # ----------------------------
 # PAGE CONFIG
@@ -53,6 +52,9 @@ if uploaded_file:
     avg_vib = df["Vibration"].mean()
     max_gas = df["Gas Readings"].max()
 
+    # ----------------------------
+    # RISK CLASSIFICATION
+    # ----------------------------
     high_risk_count = len(df[df["Gas Readings"] > high_threshold])
     medium_risk_count = len(
         df[(df["Gas Readings"] > medium_threshold) &
@@ -137,7 +139,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (FINAL CORRECT ENDPOINT)
+    # GEMINI AI SECTION (OFFICIAL SDK)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -150,54 +152,39 @@ if uploaded_file:
     user_input = st.text_input("Ask about system status...")
 
     if user_input:
+        try:
+            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+            model = genai.GenerativeModel("gemini-1.5-flash")
 
-        api_key = st.secrets["GEMINI_API_KEY"]
+            context = f"""
+            Gas Average: {avg_gas}
+            Gas Maximum: {max_gas}
+            High Risk Events: {high_risk_count}
+            Medium Risk Events: {medium_risk_count}
+            Valve Status: {"Closed" if valve_closed else "Open"}
+            Medium Threshold: {medium_threshold}
+            High Threshold: {high_threshold}
+            """
 
-        context = f"""
-        Gas Average: {avg_gas}
-        Gas Maximum: {max_gas}
-        High Risk Events: {high_risk_count}
-        Medium Risk Events: {medium_risk_count}
-        Valve Status: {"Closed" if valve_closed else "Open"}
-        Medium Threshold: {medium_threshold}
-        High Threshold: {high_threshold}
-        """
+            prompt = f"""
+            You are an industrial IoT gas safety monitoring AI assistant.
 
-        prompt = f"""
-        You are an industrial IoT gas safety monitoring AI assistant.
+            System Data:
+            {context}
 
-        System Data:
-        {context}
+            User Question:
+            {user_input}
 
-        User Question:
-        {user_input}
+            Provide a professional safety-focused response.
+            """
 
-        Provide a professional, safety-focused response.
-        """
+            response = model.generate_content(prompt)
 
-        url = f"https://api.google.dev/gemini/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+            st.info(response.text)
 
-        headers = {
-            "Content-Type": "application/json"
-        }
-
-        data = {
-            "contents": [{
-                "parts": [{
-                    "text": prompt
-                }]
-            }]
-        }
-
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-
-        if response.status_code == 200:
-            result = response.json()
-            ai_text = result["candidates"][0]["content"]["parts"][0]["text"]
-            st.info(ai_text)
-        else:
+        except Exception as e:
             st.error("AI Error:")
-            st.write(response.text)
+            st.write(e)
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
