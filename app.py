@@ -139,7 +139,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # GEMINI AI SECTION (OFFICIAL SDK)
+    # GEMINI AI SECTION (STABLE MODEL)
     # ----------------------------
     st.subheader("AI Industrial Safety Assistant")
 
@@ -154,7 +154,9 @@ if uploaded_file:
     if user_input:
         try:
             genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            model = genai.GenerativeModel("gemini-1.5-flash")
+
+            # ✅ Using universally supported model
+            model = genai.GenerativeModel("gemini-pro")
 
             context = f"""
             Gas Average: {avg_gas}
