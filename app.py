@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 import plotly.graph_objects as go
+from datetime import datetime
 
 # PDF imports
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -19,7 +20,34 @@ st.set_page_config(
     layout="wide"
 )
 
+# ----------------------------
+# EXECUTIVE HEADER (NEW - VISUAL ONLY)
+# ----------------------------
+st.markdown("""
+<h1 style='text-align:center;'>SMART INDUSTRIAL SAFETY TERMINAL</h1>
+<h4 style='text-align:center;color:gray;'>
+System ID: SG-2026-IND | Location: Industrial Zone A
+</h4>
+""", unsafe_allow_html=True)
+
+st.write("Last Updated:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+st.divider()
+
 st.title("Smart Gas Leakage Detection & Prevention System")
+
+# ----------------------------
+# BLINK ANIMATION (NEW - VISUAL ONLY)
+# ----------------------------
+st.markdown("""
+<style>
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.blink {
+  animation: blink 1s infinite;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ----------------------------
 # SIDEBAR - THRESHOLDS
@@ -76,6 +104,12 @@ if uploaded_file:
         severity_label = "HIGH RISK"
 
     # ----------------------------
+    # NEW: RISK SIGNAL BAR
+    # ----------------------------
+    st.subheader("System Risk Signal Strength")
+    st.progress(risk_score / 100)
+
+    # ----------------------------
     # METRICS
     # ----------------------------
     col1, col2, col3, col4 = st.columns(4)
@@ -113,12 +147,23 @@ if uploaded_file:
     st.plotly_chart(fig, use_container_width=True)
 
     # ----------------------------
+    # NEW: RISK CONTRIBUTION PIE
+    # ----------------------------
+    st.subheader("Risk Contribution Breakdown")
+    fig_pie = go.Figure(data=[go.Pie(
+        labels=["Gas", "Temperature", "Vibration"],
+        values=[gas_score, temp_score, vibration_score],
+        hole=0.4
+    )])
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+    # ----------------------------
     # VALVE STATUS
     # ----------------------------
     st.subheader("Automatic Safety Valve Status")
     if risk_score >= 60:
         valve_status = "Closed"
-        st.error("🔴 VALVE CLOSED — Leak Prevention Activated")
+        st.markdown("<h3 class='blink' style='color:red;'>🔴 VALVE CLOSED — Leak Prevention Activated</h3>", unsafe_allow_html=True)
     else:
         valve_status = "Open"
         st.success("🟢 VALVE OPEN — System Operating Normally")
@@ -161,6 +206,32 @@ if uploaded_file:
         st.success(vib_reason)
 
     # ----------------------------
+    # NEW: INCIDENT TIMELINE
+    # ----------------------------
+    st.subheader("Incident Timeline Log")
+    if len(high_risk) > 0:
+        st.write("• Gas threshold exceeded.")
+    if len(high_temp) > 0:
+        st.write("• High temperature event detected.")
+    if len(vibration_detected) > 0:
+        st.write("• Vibration activity detected.")
+    if risk_score >= 60:
+        st.write("• Emergency valve shutdown executed.")
+    if risk_score < 30:
+        st.write("• System operating within safe parameters.")
+
+    # ----------------------------
+    # NEW: RECOMMENDATION ENGINE
+    # ----------------------------
+    st.subheader("Recommended Action Plan")
+    if risk_score >= 60:
+        st.error("Immediate inspection required. Evacuate area and isolate gas supply.")
+    elif risk_score >= 30:
+        st.warning("Monitor closely. Schedule preventive maintenance check.")
+    else:
+        st.success("No immediate action required. Continue routine monitoring.")
+
+    # ----------------------------
     # HEATMAP
     # ----------------------------
     st.subheader("Gas Risk Heatmap")
@@ -198,7 +269,7 @@ if uploaded_file:
     )
 
     # ----------------------------
-    # PDF DOWNLOAD WITH DETAILED EXPLANATION
+    # PDF DOWNLOAD
     # ----------------------------
     def generate_pdf():
         pdf_buffer = BytesIO()
@@ -220,33 +291,10 @@ Valve Status: {valve_status}
 Gas Status: {gas_reason}
 Temperature Status: {temp_reason}
 Vibration Status: {vib_reason}
-
-The system integrates gas concentration, ambient temperature,
-and vibration analytics to determine environmental safety.
-Risk scoring allows automated valve intervention and
-prevents escalation of hazardous scenarios.
 """
         elements.append(Paragraph(summary_text, styles["Normal"]))
         elements.append(Spacer(1, 0.4 * inch))
 
-        table_data = [
-            ["Metric", "Value"],
-            ["Average Gas", round(avg_gas,2)],
-            ["Maximum Gas", max_gas],
-            ["Average Temperature", round(avg_temp,2)],
-            ["Average Vibration", round(avg_vib,2)],
-            ["High Gas Events", len(high_risk)],
-            ["High Temperature Events", len(high_temp)],
-            ["Vibration Events", len(vibration_detected)],
-        ]
-
-        table = Table(table_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('GRID', (0,0), (-1,-1), 1, colors.black),
-        ]))
-
-        elements.append(table)
         doc.build(elements)
         pdf_buffer.seek(0)
         return pdf_buffer
@@ -259,46 +307,6 @@ prevents escalation of hazardous scenarios.
         file_name="Gas_Leakage_System_Report.pdf",
         mime="application/pdf"
     )
-
-    # ----------------------------
-    # SMART ASSISTANT RESTORED
-    # ----------------------------
-    st.subheader("Smart Safety Assistant")
-
-    suggested_questions = [
-        "Is the system safe?",
-        "What is the risk score?",
-        "Explain valve status",
-        "What caused the alert?",
-        "How many high gas events?",
-        "Give executive summary"
-    ]
-
-    selected = st.selectbox("Select a question:", ["-- Select --"] + suggested_questions)
-    user_input = st.text_input("Or type your own question:")
-
-    if user_input:
-        q = user_input.lower()
-    elif selected != "-- Select --":
-        q = selected.lower()
-    else:
-        q = None
-
-    if q:
-        if "safe" in q:
-            st.success("System safe." if risk_score < 60 else "System NOT safe.")
-        elif "risk score" in q:
-            st.info(f"Risk Score: {risk_score}/100")
-        elif "valve" in q:
-            st.info(f"Valve is {valve_status}")
-        elif "alert" in q:
-            st.info(f"Gas: {gas_reason}\nTemperature: {temp_reason}\nVibration: {vib_reason}")
-        elif "high gas" in q:
-            st.info(f"High Gas Events: {len(high_risk)}")
-        elif "summary" in q:
-            st.info(f"Risk Score: {risk_score}, Severity: {severity_label}, Valve: {valve_status}")
-        else:
-            st.info("Ask about safety, risk, valve, alerts or summary.")
 
 else:
     st.info("Upload a CSV file to begin monitoring.")
